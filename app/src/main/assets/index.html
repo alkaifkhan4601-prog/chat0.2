@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WhatsApp Chat PDF Maker</title>
+<style>
+/* Layout: one column. Setup card first, then a phone-style chat panel with a toolbar above it. */
+:root{
+  --bg:#e9e4da; --panel:#ffffff; --fg:#111b21; --muted:#667781; --line:#d1d7db;
+  --brand:#0b6e5f; --brand-fg:#ffffff;
+  --chat-bg:#efeae2; --in:#ffffff; --out:#d9fdd3; --sys:#fff5c4; --sys-fg:#54656f; --date:#ffffff;
+  --head:#0b6e5f; --head-fg:#ffffff;
+  --display:"Poppins","Segoe UI",system-ui,sans-serif; --body:"Segoe UI",Helvetica,Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0b141a; --panel:#202c33; --fg:#e9edef; --muted:#8696a0; --line:#2a3942;
+    --brand:#25a68f; --brand-fg:#06201b;
+    --chat-bg:#0b141a; --in:#202c33; --out:#005c4b; --sys:#182229; --sys-fg:#8696a0; --date:#182229;
+    --head:#202c33; --head-fg:#e9edef;
+    color-scheme:dark;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font:15px/1.45 var(--body);padding-block:20px 40px;padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+h1{font:600 22px/1.2 var(--display);margin:0}
+.sub{color:var(--muted);margin:4px 0 0}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
+.drop{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;border:2px dashed var(--line);border-radius:12px;padding:28px 16px;cursor:pointer;transition:border-color .15s,background .15s}
+.drop:hover,.drop.over,.drop:focus-within{border-color:var(--brand);background:color-mix(in srgb,var(--brand) 7%,transparent)}
+.drop strong{font:600 16px var(--display)}
+.drop span{color:var(--muted);font-size:13px}
+.drop input{position:absolute;opacity:0;width:1px;height:1px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.row.end{justify-content:flex-end}
+button,select,input[type=search]{font:inherit;color:var(--fg)}
+.btn{background:var(--brand);color:var(--brand-fg);border:0;border-radius:8px;padding:9px 16px;font-weight:600;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--fg);border:1px solid var(--line)}
+.btn:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible,summary:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+details{margin-top:14px}
+summary{cursor:pointer;color:var(--muted);font-size:13px}
+textarea{width:100%;min-height:110px;margin-top:8px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:10px;font:13px/1.4 ui-monospace,Menlo,Consolas,monospace}
+.note{color:var(--muted);font-size:12.5px;margin:12px 0 0}
+.err{color:#c0392b;font-size:13px;margin:10px 0 0}
+
+.toolbar{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;align-items:end}
+.toolbar label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);min-width:0}
+.toolbar select,.toolbar input{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}
+.actions{margin-top:12px}
+
+/* chat panel */
+.phone{border-radius:14px;overflow:hidden;border:1px solid var(--line);background:var(--chat-bg)}
+.chead{background:var(--head);color:var(--head-fg);display:flex;align-items:center;gap:12px;padding:10px 14px}
+.avatar{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.22);display:grid;place-items:center;font:600 17px var(--display);flex:none}
+.chead .nm{font-weight:600;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chead .meta{font-size:12px;opacity:.8}
+.chead>div:last-child{min-width:0}
+.chat{padding:14px 12px 20px;display:flex;flex-direction:column;gap:3px;
+  background-image:radial-gradient(circle at 1px 1px,color-mix(in srgb,var(--fg) 6%,transparent) 1px,transparent 1.4px);background-size:22px 22px}
+.dsep{align-self:center;background:var(--date);color:var(--sys-fg);font-size:12px;padding:4px 11px;border-radius:8px;margin:10px 0 6px;box-shadow:0 1px .5px rgba(0,0,0,.1)}
+.sys{align-self:center;background:var(--sys);color:var(--sys-fg);font-size:12.5px;padding:5px 11px;border-radius:8px;margin:4px 0;max-width:88%;text-align:center;overflow-wrap:anywhere;white-space:pre-wrap}
+.b{max-width:80%;padding:6px 8px 5px;border-radius:8px;box-shadow:0 1px .5px rgba(0,0,0,.13);overflow-wrap:anywhere;break-inside:avoid;min-width:0}
+.b.in{align-self:flex-start;background:var(--in)}
+.b.out{align-self:flex-end;background:var(--out)}
+.b.first.in{border-top-left-radius:0;margin-top:5px}
+.b.first.out{border-top-right-radius:0;margin-top:5px}
+.who{font-size:12.5px;font-weight:600;margin-bottom:1px}
+.txt{white-space:pre-wrap}
+.txt.media{font-style:italic;color:var(--muted)}
+.t{float:right;margin:7px 0 -2px 12px;font-size:11px;color:var(--muted);line-height:1}
+.b img{display:block;max-width:100%;max-height:340px;border-radius:6px;margin-bottom:4px}
+mark{background:#ffe27a;color:#111;border-radius:2px}
+.empty{align-self:center;color:var(--muted);padding:30px 0}
+[hidden]{display:none!important}
+
+@page{margin:10mm}
+@media print{
+  html,body{background:#fff!important}
+  body{padding:0}
+  .wrap{max-width:none;gap:0}
+  .no-print{display:none!important}
+  .phone{border:0;border-radius:0}
+  .chead,.chat,.b,.dsep,.sys{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  :root{--chat-bg:#efeae2;--in:#fff;--out:#d9fdd3;--sys:#fff5c4;--sys-fg:#54656f;--date:#fff;--head:#0b6e5f;--head-fg:#fff;--fg:#111b21;--muted:#667781}
+  .b img{max-height:260px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="no-print">
+    <h1>WhatsApp Chat PDF Maker</h1>
+    <p class="sub">Exported chat ko WhatsApp jaise bubbles mein dekho, phir PDF bana lo.</p>
+  </header>
+
+  <section class="card no-print" id="setup">
+    <label class="drop" id="drop">
+      <input type="file" id="file" accept=".txt,.zip,text/plain,application/zip">
+      <strong>Chat file chuno ya yahan drop karo</strong>
+      <span>WhatsApp se export ki hui .txt ya .zip file</span>
+    </label>
+    <details>
+      <summary>Ya chat ka text yahan paste karo</summary>
+      <textarea id="paste" placeholder="12/05/24, 9:41 pm - Rahul: Hello"></textarea>
+      <div class="row" style="margin-top:8px">
+        <button class="btn" id="pasteGo" type="button">Chat dikhao</button>
+        <button class="btn ghost" id="sample" type="button">Sample chat dekho</button>
+      </div>
+    </details>
+    <p class="note">Sab kuch aapke browser mein hota hai. Chat kisi server par upload nahi hoti.</p>
+    <p class="err" id="err" hidden></p>
+  </section>
+
+  <section class="card no-print" id="tools" hidden>
+    <div class="toolbar">
+      <label>Aap kaun ho? (right side)
+        <select id="me"></select>
+      </label>
+      <label>Kab se
+        <select id="from"></select>
+      </label>
+      <label>Kab tak
+        <select id="to"></select>
+      </label>
+      <label>Search
+        <input type="search" id="q" placeholder="Word likho">
+      </label>
+    </div>
+    <div class="row actions">
+      <button class="btn" id="pdf" type="button">Download PDF</button>
+      <button class="btn ghost" id="again" type="button">Nayi chat</button>
+      <span class="note" style="margin:0">Print window mein Destination ko <b>Save as PDF</b> karo.</span>
+    </div>
+  </section>
+
+  <section class="phone" id="phone" hidden>
+    <div class="chead">
+      <div class="avatar" id="av">W</div>
+      <div><div class="nm" id="title"></div><div class="meta" id="meta"></div></div>
+    </div>
+    <div class="chat" id="chat"></div>
+  </section>
+</div>
+
+<script>
+(function(){
+  var $ = function(s){ return document.querySelector(s); };
+  var state = { msgs: [], title: 'WhatsApp Chat', media: {}, people: [] };
+
+  var DATE = '\\d{1,4}[\\/.\\-]\\d{1,2}[\\/.\\-]\\d{1,4}';
+  var TIME = '\\d{1,2}[:.]\\d{2}(?::\\d{2})?(?:\\s?[APap]\\.?\\s?[Mm]\\.?)?';
+  var reAndroid = new RegExp('^(' + DATE + '),?\\s+(' + TIME + ')\\s+-\\s+([\\s\\S]*)$');
+  var reIOS = new RegExp('^\\[(' + DATE + '),?\\s+(' + TIME + ')\\]\\s+([\\s\\S]*)$');
+
+  function clean(s){
+    return s.replace(/^﻿/, '').replace(/[‎‏‪-‮]/g, '').replace(/[  ]/g, ' ');
+  }
+
+  function parse(text){
+    var lines = clean(text).split(/\r?\n/);
+    var msgs = [], cur = null, i, m, rest, k;
+    for (i = 0; i < lines.length; i++){
+      var line = lines[i];
+      m = line.match(reIOS) || line.match(reAndroid);
+      if (m){
+        if (cur) msgs.push(cur);
+        rest = m[3];
+        k = rest.indexOf(': ');
+        if (k > 0 && k < 60) cur = { date: m[1], time: m[2], sender: rest.slice(0, k), text: rest.slice(k + 2) };
+        else cur = { date: m[1], time: m[2], sender: null, text: rest };
+      } else if (cur){
+        cur.text += '\n' + line;
+      }
+    }
+    if (cur) msgs.push(cur);
+    return msgs;
+  }
+  window.__parse = parse;
+
+  var NAME_COLORS = ['#1f8f6b','#c0392b','#2c7be5','#b8730a','#8e44ad','#16a085','#d6336c','#5f6caf','#a0522d','#3d8b37'];
+
+  function colorFor(name){
+    var h = 0;
+    for (var i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+    return NAME_COLORS[h % NAME_COLORS.length];
+  }
+
+  var MEDIA_RE = /(<media omitted>|<attached:[^>]*>|\b(image|video|audio|sticker|gif|document|contact card|GIF) omitted\b|\(file attached\))/i;
+  var IMG_RE = /([\w\-]+\.(?:jpg|jpeg|png|webp|gif))/i;
+
+  function fillSelect(sel, values, selected){
+    sel.innerHTML = '';
+    values.forEach(function(v, idx){
+      var o = document.createElement('option');
+      o.value = typeof v === 'object' ? v.value : v;
+      o.textContent = typeof v === 'object' ? v.label : v;
+      sel.appendChild(o);
+    });
+    if (selected != null) sel.value = selected;
+  }
+
+  function highlight(el, text, q){
+    if (!q){ el.textContent = text; return; }
+    var low = text.toLowerCase(), ql = q.toLowerCase(), pos = 0, at;
+    while ((at = low.indexOf(ql, pos)) !== -1){
+      if (at > pos) el.appendChild(document.createTextNode(text.slice(pos, at)));
+      var mk = document.createElement('mark');
+      mk.textContent = text.slice(at, at + q.length);
+      el.appendChild(mk);
+      pos = at + q.length;
+    }
+    if (pos < text.length) el.appendChild(document.createTextNode(text.slice(pos)));
+  }
+
+  function render(){
+    var me = $('#me').value, q = $('#q').value.trim();
+    var dates = state.dates, fi = dates.indexOf($('#from').value), ti = dates.indexOf($('#to').value);
+    if (fi > ti){ var t = fi; fi = ti; ti = t; }
+    var group = state.people.length > 2;
+    var frag = document.createDocumentFragment();
+    var lastDate = null, lastSender = undefined, shown = 0;
+
+    state.msgs.forEach(function(m){
+      var di = dates.indexOf(m.date);
+      if (di < fi || di > ti) return;
+      if (q && (m.text + ' ' + (m.sender || '')).toLowerCase().indexOf(q.toLowerCase()) === -1) return;
+      shown++;
+      if (m.date !== lastDate){
+        var d = document.createElement('div');
+        d.className = 'dsep'; d.textContent = m.date;
+        frag.appendChild(d);
+        lastDate = m.date; lastSender = undefined;
+      }
+      if (m.sender === null){
+        var s = document.createElement('div');
+        s.className = 'sys'; s.textContent = m.text;
+        frag.appendChild(s);
+        lastSender = undefined;
+        return;
+      }
+      var out = m.sender === me;
+      var first = m.sender !== lastSender;
+      lastSender = m.sender;
+      var b = document.createElement('div');
+      b.className = 'b ' + (out ? 'out' : 'in') + (first ? ' first' : '');
+      if (group && !out && first){
+        var w = document.createElement('div');
+        w.className = 'who'; w.style.color = colorFor(m.sender); w.textContent = m.sender;
+        b.appendChild(w);
+      }
+      var im = m.text.match(IMG_RE);
+      if (im && state.media[im[1].toLowerCase()]){
+        var img = document.createElement('img');
+        img.src = state.media[im[1].toLowerCase()]; img.alt = im[1];
+        b.appendChild(img);
+        var cap = m.text.replace(im[1], '').replace(/\(file attached\)|<attached:\s*>/gi, '').trim();
+        if (cap){
+          var c = document.createElement('div'); c.className = 'txt'; highlight(c, cap, q); b.appendChild(c);
+        }
+      } else {
+        var tx = document.createElement('div');
+        var isMedia = MEDIA_RE.test(m.text) && m.text.length < 120;
+        tx.className = 'txt' + (isMedia ? ' media' : '');
+        highlight(tx, m.text, q);
+        b.appendChild(tx);
+      }
+      var tm = document.createElement('span');
+      tm.className = 't'; tm.textContent = m.time;
+      b.appendChild(tm);
+      var clear = document.createElement('div'); clear.style.clear = 'both';
+      b.appendChild(clear);
+      frag.appendChild(b);
+    });
+
+    var chat = $('#chat');
+    chat.innerHTML = '';
+    if (!shown){
+      var e = document.createElement('div'); e.className = 'empty'; e.textContent = 'Koi message nahi mila.';
+      chat.appendChild(e);
+    } else chat.appendChild(frag);
+    $('#meta').textContent = shown + ' messages' + (state.people.length ? ' · ' + state.people.length + ' log' : '');
+  }
+
+  function show(msgs, title){
+    if (!msgs.length){
+      var er = $('#err');
+      er.hidden = false;
+      er.textContent = 'Is file mein koi WhatsApp message nahi mila. Export ki hui .txt file chuno.';
+      return;
+    }
+    $('#err').hidden = true;
+    state.msgs = msgs;
+    var seen = {}, people = [], dates = [], dseen = {};
+    msgs.forEach(function(m){
+      if (m.sender && !seen[m.sender]){ seen[m.sender] = 1; people.push(m.sender); }
+      if (!dseen[m.date]){ dseen[m.date] = 1; dates.push(m.date); }
+    });
+    state.people = people; state.dates = dates;
+    fillSelect($('#me'), people.length ? people : ['-'], people[0]);
+    fillSelect($('#from'), dates, dates[0]);
+    fillSelect($('#to'), dates, dates[dates.length - 1]);
+    $('#q').value = '';
+    state.title = title || (people.length === 2 ? people[1] : people.join(', ')) || 'WhatsApp Chat';
+    $('#setup').hidden = true;
+    $('#tools').hidden = false;
+    $('#phone').hidden = false;
+    updateHead();
+    render();
+    window.scrollTo(0, 0);
+  }
+
+  function updateHead(){
+    var me = $('#me').value;
+    var t = state.title;
+    if (state.people.length === 2 && !state.fromFile){
+      t = state.people.filter(function(p){ return p !== me; })[0] || t;
+    }
+    $('#title').textContent = t;
+    $('#av').textContent = (t.trim()[0] || 'W').toUpperCase();
+    document.title = t + ' - WhatsApp chat';
+  }
+
+  function titleFromName(name){
+    var m = name.match(/WhatsApp Chat (?:with|-)\s*(.+?)\.(?:txt|zip)$/i);
+    return m ? m[1].trim() : '';
+  }
+
+  function loadScript(src){
+    return new Promise(function(res, rej){
+      var s = document.createElement('script');
+      s.src = src; s.onload = res; s.onerror = function(){ rej(new Error('script')); };
+      document.head.appendChild(s);
+    });
+  }
+
+  function readZip(file){
+    var go = window.JSZip ? Promise.resolve() : loadScript('jszip.min.js').catch(function(){
+      return loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+    });
+    return go.then(function(){ return window.JSZip.loadAsync(file); }).then(function(zip){
+      var names = Object.keys(zip.files).filter(function(n){ return !zip.files[n].dir; });
+      var txts = names.filter(function(n){ return /\.txt$/i.test(n); });
+      if (!txts.length) throw new Error('notxt');
+      var pick = txts.filter(function(n){ return /chat/i.test(n); })[0] || txts[0];
+      var imgs = names.filter(function(n){ return /\.(jpg|jpeg|png|webp|gif)$/i.test(n); });
+      return Promise.all([
+        zip.files[pick].async('string'),
+        Promise.all(imgs.map(function(n){
+          return zip.files[n].async('blob').then(function(b){
+            state.media[n.split('/').pop().toLowerCase()] = URL.createObjectURL(b);
+          });
+        }))
+      ]).then(function(r){ return r[0]; });
+    });
+  }
+
+  function handleFile(file){
+    if (!file) return;
+    state.media = {};
+    state.fromFile = true;
+    var title = titleFromName(file.name);
+    var p = /\.zip$/i.test(file.name) ? readZip(file) : file.text();
+    p.then(function(text){ show(parse(text), title); }).catch(function(){
+      var er = $('#err');
+      er.hidden = false;
+      er.textContent = 'File nahi khul payi. Dobara export karke .txt file try karo.';
+    });
+  }
+
+  var SAMPLE = [
+    '08/11/26, 9:12 am - Messages and calls are end-to-end encrypted. No one outside of this chat, not even WhatsApp, can read or listen to them.',
+    '08/11/26, 9:14 am - Rahul: Bhai kal ka plan kya hai?',
+    '08/11/26, 9:15 am - Priya: Subah 10 baje office, phir lunch pe milte hain',
+    '08/11/26, 9:15 am - Priya: Wahi purana cafe?',
+    '08/11/26, 9:16 am - Rahul: Haan done 👍',
+    'Aur report bhi le aana,',
+    'client ko dikhani hai.',
+    '08/11/26, 9:18 am - Priya: <Media omitted>',
+    '08/11/26, 9:20 am - Priya: Ye wali report hai, check kar lo',
+    '09/11/26, 8:02 pm - Rahul: Lunch badhiya raha, thanks!',
+    '09/11/26, 8:05 pm - Priya: Welcome 😊 Agli baar meri taraf se'
+  ].join('\n');
+
+  var drop = $('#drop');
+  $('#file').addEventListener('change', function(e){ handleFile(e.target.files[0]); e.target.value = ''; });
+  ['dragenter','dragover'].forEach(function(ev){
+    drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.add('over'); });
+  });
+  ['dragleave','drop'].forEach(function(ev){
+    drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.remove('over'); });
+  });
+  drop.addEventListener('drop', function(e){ handleFile(e.dataTransfer.files[0]); });
+
+  $('#pasteGo').addEventListener('click', function(){
+    state.media = {}; state.fromFile = false;
+    show(parse($('#paste').value), '');
+  });
+  $('#sample').addEventListener('click', function(){
+    state.media = {}; state.fromFile = false;
+    show(parse(SAMPLE), '');
+  });
+  $('#me').addEventListener('change', function(){ updateHead(); render(); });
+  $('#from').addEventListener('change', render);
+  $('#to').addEventListener('change', render);
+  $('#q').addEventListener('input', render);
+  $('#pdf').addEventListener('click', function(){
+    if (window.AndroidPrint) window.AndroidPrint.print(document.title);
+    else window.print();
+  });
+  $('#again').addEventListener('click', function(){
+    $('#setup').hidden = false; $('#tools').hidden = true; $('#phone').hidden = true;
+    document.title = 'WhatsApp Chat PDF Maker';
+  });
+})();
+</script>
+</body>
+</html>
